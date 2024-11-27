@@ -51,23 +51,10 @@ jobs:
     - name: Run instrumented tests
       run: cd testapp && ./gradlew connectedAndroidTest
 
-    # Step 7: Create release
-    - name: Create Release
-      id: create_release
-      uses: ghodss/create-release@v1
-      with:
-        tag_name: v${{ github.run_number }} 
-        release_name: Release v${{ github.run_number }}
-        body: 'New version'
-        draft: false
-        prerelease: false
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-    # Paso 8: Upload APK to release
-    - name: Upload APK to GitHub Release
+    # Step 7: Create a GitHub release and upload the APK
+    - name: Create GitHub Release and Upload APK
       uses: softprops/action-gh-release@v1
       with:
-        files: app/build/outputs/apk/debug/app-debug.apk
+          files: app/build/outputs/apk/debug/app-debug.apk
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
