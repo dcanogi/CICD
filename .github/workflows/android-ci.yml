@@ -43,6 +43,10 @@ jobs:
           echo $ENCODED_STRING > keystore-b64.txt
           base64 -d keystore-b64.txt > testapp/keystore.jks
 
+      # Give Gradle wrapper execution permissions
+      - name: Give Gradle wrapper execution permissions
+        run: chmod +x testapp/gradlew
+
       - name: Build Release apk
         env:
           RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
