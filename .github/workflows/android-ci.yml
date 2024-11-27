@@ -1,88 +1,94 @@
-name: Android CI - Run Specific Test and Upload APK
-
+name: Production Builds
 on:
-  push:
-    branches:
-      - main
-  pull_request:
-    branches:
-      - main
+  workflow_dispatch:
+    inputs:
+      name:
+        description: "Release-Build"
+        default: "Generate release build"
+      testers:
+        type: choice
+        description: "Select testers"
+        options:
+          - android
+          - internalTesters
+          - everyone
 
 jobs:
-  test:
+  build:
     runs-on: ubuntu-latest
 
     steps:
-    # Step 1: Checkout code
-    - name: Checkout code
-      uses: actions/checkout@v3
+      - name: Checking out branch
+        uses: actions/checkout@v3
 
-    # Step 2: Install required dependencies
-    - name: Install dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y wget unzip
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: 17
 
-    # Step 3: Install Android SDK
-    - name: Install Android SDK
-      run: |
-        # Download SDK Tools
-        wget https://dl.google.com/android/repository/commandlinetools-linux-8512546_latest.zip -O sdk-tools.zip
-        unzip sdk-tools.zip -d $HOME/Android
-        rm sdk-tools.zip
-        echo "y" | $HOME/Android/cmdline-tools/bin/sdkmanager --sdk_root=$HOME/Android --update
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v2.0.10
 
-    # Step 4: Install Android SDK packages
-    - name: Install SDK packages
-      run: |
-        yes | $HOME/Android/cmdline-tools/bin/sdkmanager --sdk_root=$HOME/Android --licenses
-        $HOME/Android/cmdline-tools/bin/sdkmanager --sdk_root=$HOME/Android --install "build-tools;30.0.3" "platform-tools" "platforms;android-30" "system-images;android-30;google_apis;x86_64"
+      # This will decode the keystore from base 64 text representation that we have stored in secrets
+      # and generates and keystore file and gets stored in /android-app path
+      - name: Decode Keystore
+        env:
+          ENCODED_STRING: ${{ secrets.KEYSTORE_BASE_64 }}
+          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          RELEASE_KEYSTORE_ALIAS: ${{ secrets.RELEASE_KEYSTORE_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
 
-    # Step 5: Set up Android emulator and start it
-    - name: Set up Android emulator and start it
-      run: |
-        # Create a new AVD if it doesn't exist
-        echo no | $HOME/Android/cmdline-tools/bin/avdmanager --sdk_root=$HOME/Android create avd -n test -k "system-images;android-30;google_apis;x86_64" --force
-        # Start the emulator in the background
-        $HOME/Android/emulator/emulator -avd test -no-window -no-audio -gpu swiftshader_indirect -no-snapshot -accel off &
-        # Wait for the emulator to boot
-        adb wait-for-device
-        # Unlock the emulator screen
-        adb shell input keyevent 82
-        sleep 15
+        run: |
+          echo $ENCODED_STRING > keystore-b64.txt
+          base64 -d keystore-b64.txt > keystore.jks
 
-    # Step 6: Cache Gradle dependencies
-    - name: Cache Gradle dependencies
-      uses: actions/cache@v3
-      with:
-        path: ~/.gradle/caches
-        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-        restore-keys: |
-          ${{ runner.os }}-gradle-
+      - name: Build Release apk
+        env:
+          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          RELEASE_KEYSTORE_ALIAS: ${{ secrets.RELEASE_KEYSTORE_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+        run: ./gradlew assembleRelease --stacktrace
 
-    # Step 7: Build APK
-    - name: Build APK
-      run: |
-        cd testapp
-        ./gradlew clean assembleDebug
+      - name: Build Release bundle
+        env:
+          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          RELEASE_KEYSTORE_ALIAS: ${{ secrets.RELEASE_KEYSTORE_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+        run: ./gradlew bundleRelease --stacktrace
 
-    # Step 8: Run Specific Test
-    - name: Run Specific Test
-      run: |
-        cd testapp
-        ./gradlew testDebugUnitTest --tests "com.example.myapplication.MainActivityTest"
+      - name: Get release file aab path
+        id: releaseAab
+        run: echo "aabfile=$(find app/build/outputs/bundle/release/*.aab)" >> $GITHUB_OUTPUT
 
-    # Step 9: Upload APK as artifact
-    - name: Upload APK as artifact
-      uses: actions/upload-artifact@v3
-      with:
-        name: app-debug-apk
-        path: testapp/app/build/outputs/apk/debug/app-debug.apk
+      - name: Get release file apk path
+        id: releaseApk
+        run: echo "apkfile=$(find app/build/outputs/apk/release/*.apk)" >> $GITHUB_OUTPUT
 
-    # Step 10: Upload test results (optional)
-    - name: Upload test results
-      if: always()
-      uses: actions/upload-artifact@v3
-      with:
-        name: test-results
-        path: testapp/app/build/reports/tests/testDebugUnitTest/
+      - name: Zip Files
+        uses: papeloto/action-zip@v1
+        with:
+          files: ${{ steps.releaseAab.outputs.aabfile }} ${{ steps.releaseApk.outputs.apkfile }}
+          dest: ${{ steps.releaseApk.outputs.apkfile }}.zip
+
+#      - name: Sending release build to Slack
+#        uses: MeilCli/slack-upload-file@v3
+#        with:
+#          slack_token: ${{ secrets.SLACK_BOT_TOKEN }}
+#          file_path: ${{ steps.releaseApk.outputs.apkfile }}.zip
+#          channel_id: ${{ secrets.SLACK_CHANNEL_ID }}
+#          initial_comment: "Release build is now available."
+#
+#      - name: upload apk to Firebase App Distribution
+#        uses: wzieba/Firebase-Distribution-Github-Action@v1
+#        with:
+#          appId: ${{secrets.FIREBASE_APP_ID_RELEASE}}
+#          serviceCredentialsFileContent: ${{ secrets.SERVICE_CREDENTIALS_FILE_RELEASE }}
+#          groups: ${{ github.event.inputs.testers }}
+#          file: ${{ steps.releaseApk.outputs.apkfile }}
+
+      - name: Upload Release Build to Artifacts
+        uses: actions/upload-artifact@v3
+        with:
+           name: release-artifacts
+           path: ${{ steps.releaseApk.outputs.apkfile }}
