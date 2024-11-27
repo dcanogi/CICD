@@ -51,11 +51,23 @@ jobs:
     - name: Run instrumented tests
       run: cd testapp && ./gradlew connectedAndroidTest
 
-    # Step 7: Upload to Firebase App Distribution
-    - name: Upload to Firebase App Distribution
-      uses: wzieba/Firebase-Distribution-Github-Action@v1
+    # Step 7: Create release
+    - name: Create Release
+      id: create_release
+      uses: ghodss/create-release@v1
       with:
-        appId: ${{ secrets.FIREBASE_APP_ID }}
-        token: ${{ secrets.FIREBASE_AUTH_TOKEN }}
-        groups: 'testers'  # Here you define the Firebase testers groups
-        file: testapp/app/build/outputs/apk/debug/app-debug.apk
+        tag_name: v${{ github.run_number }} 
+        release_name: Release v${{ github.run_number }}
+        body: 'New version'
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    # Paso 8: Upload APK to release
+    - name: Upload APK to GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: app/build/outputs/apk/debug/app-debug.apk
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
