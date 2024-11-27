@@ -26,7 +26,12 @@ jobs:
 
     # Step 3: Set up Android SDK
     - name: Set up Android SDK
-      uses: shiika/android-setup-action@v2
+      uses: reactivecircus/android-emulator-runner@v2
+      with:
+        api-level: 30
+        target: google_apis
+        arch: x86_64
+        force-avd-creation: true
 
     # Step 4: Cache Gradle dependencies
     - name: Cache Gradle dependencies
