@@ -53,11 +53,8 @@ jobs:
           RELEASE_KEYSTORE_ALIAS: ${{ secrets.RELEASE_KEYSTORE_ALIAS }}
           RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
         run: cd testapp && ./gradlew assembleRelease --stacktrace
-      - name: Run Specific Test
-        run: |
-          cd testapp
-          ./gradlew testDebugUnitTest --tests "com.example.myapplication.MainActivityTest"
-
+      - name: Run Android Tests
+        run: cd testapp && ./gradlew connectedDebugAndroidTest --stacktrace
       - name: Build Release bundle
         env:
           RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
