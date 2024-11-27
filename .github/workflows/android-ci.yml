@@ -32,25 +32,29 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-gradle-
 
-    # Step 4: Build the Android app within the testapp directory
+    # Step 4: Make gradlew executable
+    - name: Make gradlew executable
+      run: chmod +x testapp/gradlew
+
+    # Step 5: Build the Android app within the testapp directory
     - name: Build the app
       run: |
         cd testapp
         ./gradlew build
 
-    # Step 5: Run unit tests within the testapp directory
+    # Step 6: Run unit tests within the testapp directory
     - name: Run unit tests
       run: |
         cd testapp
         ./gradlew test
 
-    # Step 6: Run instrumented tests within the testapp directory
+    # Step 7: Run instrumented tests within the testapp directory
     - name: Run instrumented tests
       run: |
         cd testapp
         ./gradlew connectedAndroidTest
 
-    # Step 7: Create GitHub release and upload APK
+    # Step 8: Create GitHub release and upload APK
     - name: Create Release and Upload APK to GitHub
       uses: softprops/action-gh-release@v1
       with:
