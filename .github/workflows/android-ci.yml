@@ -17,36 +17,41 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v3
 
-    # Step 2: Set up JDK 17
-    - name: Set up JDK 17
-      uses: actions/setup-java@v3
-      with:
-        java-version: '17'
-        distribution: 'temurin'
-    - name: Update Android SDK
+    # Step 2: Install required dependencies
+    - name: Install dependencies
       run: |
-        yes | sdkmanager --update
+        sudo apt-get update
+        sudo apt-get install -y wget unzip
 
+    # Step 3: Install Android SDK
+    - name: Install Android SDK
+      run: |
+        # Download SDK Tools
+        wget https://dl.google.com/android/repository/commandlinetools-linux-8512546_latest.zip -O sdk-tools.zip
+        unzip sdk-tools.zip -d $HOME/Android
+        rm sdk-tools.zip
+        echo "y" | $HOME/Android/cmdline-tools/bin/sdkmanager --sdk_root=$HOME/Android --update
 
-    # Step 3: Set up Android SDK and emulator (with proper script)
-    - name: Set up Android SDK and start emulator
-      uses: reactivecircus/android-emulator-runner@v2
-      with:
-        api-level: 30
-        target: google_apis
-        arch: x86_64
-        force-avd-creation: true
-        script: |
-          # Start the emulator in the background
-          $HOME/Android/emulator/emulator -avd test -no-window -no-audio -gpu swiftshader_indirect -no-snapshot -accel off &
-          # Wait for the emulator to boot up completely
-          adb wait-for-device
-          # Unlock the screen
-          adb shell input keyevent 82
-          # Wait a few seconds to make sure everything is ready
-          sleep 15
+    # Step 4: Install Android SDK packages
+    - name: Install SDK packages
+      run: |
+        yes | $HOME/Android/cmdline-tools/bin/sdkmanager --sdk_root=$HOME/Android --licenses
+        $HOME/Android/cmdline-tools/bin/sdkmanager --sdk_root=$HOME/Android --install "build-tools;30.0.3" "platform-tools" "platforms;android-30" "system-images;android-30;google_apis;x86_64"
 
-    # Step 4: Cache Gradle dependencies
+    # Step 5: Set up Android emulator and start it
+    - name: Set up Android emulator and start it
+      run: |
+        # Create a new AVD if it doesn't exist
+        echo no | $HOME/Android/cmdline-tools/bin/avdmanager --sdk_root=$HOME/Android create avd -n test -k "system-images;android-30;google_apis;x86_64" --force
+        # Start the emulator in the background
+        $HOME/Android/emulator/emulator -avd test -no-window -no-audio -gpu swiftshader_indirect -no-snapshot -accel off &
+        # Wait for the emulator to boot
+        adb wait-for-device
+        # Unlock the emulator screen
+        adb shell input keyevent 82
+        sleep 15
+
+    # Step 6: Cache Gradle dependencies
     - name: Cache Gradle dependencies
       uses: actions/cache@v3
       with:
@@ -55,26 +60,26 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-gradle-
 
-    # Step 5: Build APK
+    # Step 7: Build APK
     - name: Build APK
       run: |
         cd testapp
         ./gradlew clean assembleDebug
 
-    # Step 6: Run Specific Test
+    # Step 8: Run Specific Test
     - name: Run Specific Test
       run: |
         cd testapp
         ./gradlew testDebugUnitTest --tests "com.example.myapplication.MainActivityTest"
 
-    # Step 7: Upload APK as artifact
+    # Step 9: Upload APK as artifact
     - name: Upload APK as artifact
       uses: actions/upload-artifact@v3
       with:
         name: app-debug-apk
         path: testapp/app/build/outputs/apk/debug/app-debug.apk
 
-    # Step 8: Upload test results (optional)
+    # Step 10: Upload test results (optional)
     - name: Upload test results
       if: always()
       uses: actions/upload-artifact@v3
