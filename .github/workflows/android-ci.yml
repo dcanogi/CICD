@@ -23,6 +23,10 @@ jobs:
       with:
         java-version: '17'
         distribution: 'temurin'
+    - name: Update Android SDK
+      run: |
+        yes | sdkmanager --update
+
 
     # Step 3: Set up Android SDK and emulator (with proper script)
     - name: Set up Android SDK and start emulator
