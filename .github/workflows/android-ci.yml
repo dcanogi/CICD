@@ -33,13 +33,15 @@ jobs:
         arch: x86_64
         force-avd-creation: true
         script: |
-          # Create and start the emulator
-          echo "no" | $HOME/Android/emulator/emulator -avd test -no-window -no-audio -gpu swiftshader_indirect -no-snapshot -accel off &
-          # Wait for the emulator to be fully initialized
+          # Start the emulator in the background
+          $HOME/Android/emulator/emulator -avd test -no-window -no-audio -gpu swiftshader_indirect -no-snapshot -accel off &
+          # Wait for the emulator to boot up completely
           adb wait-for-device
-          adb shell input keyevent 82 # Unlock the emulator screen
-          sleep 5 # Give the emulator some time to fully boot
-          
+          # Unlock the screen
+          adb shell input keyevent 82
+          # Wait a few seconds to make sure everything is ready
+          sleep 15
+
     # Step 4: Cache Gradle dependencies
     - name: Cache Gradle dependencies
       uses: actions/cache@v3
