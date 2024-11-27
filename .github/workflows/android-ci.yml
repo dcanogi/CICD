@@ -24,14 +24,19 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
 
-    # Step 3: Set up Android SDK (using official setup)
-    - name: Set up Android SDK
+    # Step 3: Set up Android SDK and emulator (with proper script)
+    - name: Set up Android SDK and start emulator
       uses: reactivecircus/android-emulator-runner@v2
       with:
         api-level: 30
         target: google_apis
         arch: x86_64
         force-avd-creation: true
+        script: |
+          echo "no" | $HOME/Android/emulator/emulator -avd test -no-window -no-audio -gpu off &
+          adb wait-for-device
+          adb shell input keyevent 82 # Unlock the emulator screen
+          sleep 5 # Give the emulator some time to fully boot
 
     # Step 4: Cache Gradle dependencies
     - name: Cache Gradle dependencies
@@ -42,34 +47,26 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-gradle-
 
-    # Step 5: Create and start the emulator
-    - name: Start Emulator
-      run: |
-        echo "no" | $HOME/Android/emulator/emulator -avd test -no-window -no-audio -gpu off &
-        adb wait-for-device
-        adb shell input keyevent 82 # Unlock the emulator screen
-        sleep 5 # Give the emulator some time to fully boot
-
-    # Step 6: Build APK
+    # Step 5: Build APK
     - name: Build APK
       run: |
         cd testapp
         ./gradlew clean assembleDebug
 
-    # Step 7: Run Specific Test
+    # Step 6: Run Specific Test
     - name: Run Specific Test
       run: |
         cd testapp
         ./gradlew testDebugUnitTest --tests "com.example.myapplication.MainActivityTest"
 
-    # Step 8: Upload APK as artifact
+    # Step 7: Upload APK as artifact
     - name: Upload APK as artifact
       uses: actions/upload-artifact@v3
       with:
         name: app-debug-apk
         path: testapp/app/build/outputs/apk/debug/app-debug.apk
 
-    # Step 9: Upload test results (optional)
+    # Step 8: Upload test results (optional)
     - name: Upload test results
       if: always()
       uses: actions/upload-artifact@v3
