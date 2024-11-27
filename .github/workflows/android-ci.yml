@@ -2,11 +2,9 @@ name: CI
 
 on:
   push:
-    branches:
-      - main
+    branches: ["main"]
   pull_request:
-    branches:
-      - main
+    branches: ["main"]
   workflow_dispatch:
 
 jobs:
@@ -14,42 +12,60 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Step 1: Checkout the code
-      - name: Checkout code
-        uses: actions/checkout@v2
+    # Step 1: Checkout the source code
+    - name: Checkout code
+      uses: actions/checkout@v2
 
-      # Step 2: Set up JDK 11 (using temurin distribution)
-      - name: Set up JDK 11
-        uses: actions/setup-java@v2
-        with:
-          java-version: '11'
-          distribution: 'temurin'  # Change from adoptopenjdk to temurin
+    # Step 2: Set up JDK 11
+    - name: Set up JDK 11
+      uses: actions/setup-java@v2
+      with:
+        java-version: '11'
+        distribution: 'adoptopenjdk'
 
-      # Step 3: Cache Gradle dependencies
-      - name: Cache Gradle dependencies
-        uses: actions/cache@v2
-        with:
-          path: ~/.gradle/caches
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-          restore-keys: |
-            ${{ runner.os }}-gradle-
+    # Step 3: Configure Gradle cache
+    - name: Cache Gradle dependencies
+      uses: actions/cache@v2
+      with:
+        path: ~/.gradle/caches
+        key: ${{ runner.os }}-gradle-${{ hashFiles('testapp/**/*.gradle*', 'testapp/**/gradle-wrapper.properties') }}
+        restore-keys: |
+          ${{ runner.os }}-gradle-
 
-      # Step 4: Build the Android app
-      - name: Build the app
-        run: ./gradlew build
+    # Step 4: Build the Android app within the testapp directory
+    - name: Build the app
+      run: |
+        cd testapp
+        ./gradlew build
 
-      # Step 5: Run unit tests
-      - name: Run unit tests
-        run: ./gradlew test
+    # Step 5: Run unit tests within the testapp directory
+    - name: Run unit tests
+      run: |
+        cd testapp
+        ./gradlew test
 
-      # Step 6: Run instrumented tests
-      - name: Run instrumented tests
-        run: ./gradlew connectedAndroidTest
+    # Step 6: Run instrumented tests within the testapp directory
+    - name: Run instrumented tests
+      run: |
+        cd testapp
+        ./gradlew connectedAndroidTest
 
-      # Step 7: Create GitHub Release and Upload APK
-      - name: Create GitHub Release and Upload APK
-        uses: softprops/action-gh-release@v1
-        with:
-          files: app/build/outputs/apk/debug/app-debug.apk
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    # Step 7: Create the release on GitHub and upload the APK
+    - name: Create Release and Upload APK to GitHub
+      uses: gh-actions/create-release@v1.3.0
+      with:
+        tag_name: v${{ github.run_number }}  # Using the run number as the tag
+        release_name: Release v${{ github.run_number }}
+        body: 'Release of the new version of the app'
+        draft: false  # If you want the release to be a draft, set to true
+        prerelease: false  # Set to true if it's a prerelease
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+    # Step 8: Upload APK as a release asset
+    - name: Upload APK to Release
+      uses: actions/upload-release-asset@v1
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: testapp/app/build/outputs/apk/debug/app-debug.apk
+        asset_name: app-debug.apk
+        asset_content_type: application/vnd.android.package-archive
