@@ -12,7 +12,6 @@ on:
           - android
           - internalTesters
           - everyone
-
 jobs:
   build:
     runs-on: ubuntu-latest
