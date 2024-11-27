@@ -1,18 +1,19 @@
-name: CI
+name: Android CI - Run Specific Test and Upload APK
 
 on:
   push:
-    branches: ["main"]
+    branches:
+      - main
   pull_request:
-    branches: ["main"]
-  workflow_dispatch:
+    branches:
+      - main
 
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
 
     steps:
-    # Step 1: Checkout the source code
+    # Step 1: Checkout code
     - name: Checkout code
       uses: actions/checkout@v2
 
@@ -21,43 +22,62 @@ jobs:
       uses: actions/setup-java@v2
       with:
         java-version: '17'
-        distribution: 'temurin'  # Ensure you're using JDK 17 with Adoptium (Temurin)
+        distribution: 'temurin'
 
-    # Step 3: Configure Gradle cache
+    # Step 3: Set up Android SDK
+    - name: Set up Android SDK
+      uses: shiika/android-setup-action@v2
+
+    # Step 4: Cache Gradle dependencies
     - name: Cache Gradle dependencies
       uses: actions/cache@v2
       with:
         path: ~/.gradle/caches
-        key: ${{ runner.os }}-gradle-${{ hashFiles('testapp/**/*.gradle*', 'testapp/**/gradle-wrapper.properties') }}
+        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
         restore-keys: |
           ${{ runner.os }}-gradle-
 
-    # Step 4: Make gradlew executable
-    - name: Make gradlew executable
-      run: chmod +x testapp/gradlew
+    # Step 5: Install Android Emulator
+    - name: Set up Android Emulator
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y qemu-kvm libvirt-bin ubuntu-vm-builder bridge-utils
+        wget https://dl.google.com/android/repository/commandlinetools-linux-8512546_latest.zip
+        unzip commandlinetools-linux-8512546_latest.zip -d $HOME/Android
+        yes | $HOME/Android/cmdline-tools/bin/sdkmanager --sdk_root=$HOME/Android "platform-tools" "platforms;android-30" "build-tools;30.0.3" "system-images;android-30;google_apis;x86_64"
+        echo "y" | $HOME/Android/cmdline-tools/bin/sdkmanager --sdk_root=$HOME/Android --install "emulator"
 
-    # Step 5: Build the Android app within the testapp directory
-    - name: Build the app
+    # Step 6: Create and start the emulator
+    - name: Start Emulator
+      run: |
+        echo "no" | $HOME/Android/emulator/emulator -avd test -no-window -no-audio -gpu off &
+        adb wait-for-device
+        adb shell input keyevent 82 # Unlock the emulator screen
+        sleep 5 # Give the emulator some time to fully boot
+
+    # Step 7: Build the app
+    - name: Build APK
       run: |
         cd testapp
-        ./gradlew build
+        ./gradlew clean assembleDebug
 
-    # Step 6: Run unit tests within the testapp directory
-    - name: Run unit tests
+    # Step 8: Run Specific Test
+    - name: Run Specific Test
       run: |
         cd testapp
-        ./gradlew test
+        ./gradlew testDebugUnitTest --tests "com.example.myapplication.MainActivityTest"
 
-    # Step 7: Run instrumented tests within the testapp directory
-    - name: Run instrumented tests
-      run: |
-        cd testapp
-        ./gradlew connectedAndroidTest
-
-    # Step 8: Create GitHub release and upload APK
-    - name: Create Release and Upload APK to GitHub
-      uses: softprops/action-gh-release@v1
+    # Step 9: Upload the APK
+    - name: Upload APK as artifact
+      uses: actions/upload-artifact@v2
       with:
-        files: testapp/app/build/outputs/apk/debug/app-debug.apk
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        name: app-debug-apk
+        path: testapp/app/build/outputs/apk/debug/app-debug.apk
+
+    # Step 10: Upload test results (optional)
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v2
+      with:
+        name: test-results
+        path: testapp/app/build/reports/tests/testDebugUnitTest/
