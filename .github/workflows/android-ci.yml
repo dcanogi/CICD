@@ -15,16 +15,16 @@ jobs:
     steps:
     # Step 1: Checkout code
     - name: Checkout code
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
 
     # Step 2: Set up JDK 17
     - name: Set up JDK 17
-      uses: actions/setup-java@v2
+      uses: actions/setup-java@v3
       with:
         java-version: '17'
         distribution: 'temurin'
 
-    # Step 3: Set up Android SDK
+    # Step 3: Set up Android SDK (using official setup)
     - name: Set up Android SDK
       uses: reactivecircus/android-emulator-runner@v2
       with:
@@ -35,24 +35,14 @@ jobs:
 
     # Step 4: Cache Gradle dependencies
     - name: Cache Gradle dependencies
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
         path: ~/.gradle/caches
         key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
         restore-keys: |
           ${{ runner.os }}-gradle-
 
-    # Step 5: Install Android Emulator
-    - name: Set up Android Emulator
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y qemu-kvm libvirt-bin ubuntu-vm-builder bridge-utils
-        wget https://dl.google.com/android/repository/commandlinetools-linux-8512546_latest.zip
-        unzip commandlinetools-linux-8512546_latest.zip -d $HOME/Android
-        yes | $HOME/Android/cmdline-tools/bin/sdkmanager --sdk_root=$HOME/Android "platform-tools" "platforms;android-30" "build-tools;30.0.3" "system-images;android-30;google_apis;x86_64"
-        echo "y" | $HOME/Android/cmdline-tools/bin/sdkmanager --sdk_root=$HOME/Android --install "emulator"
-
-    # Step 6: Create and start the emulator
+    # Step 5: Create and start the emulator
     - name: Start Emulator
       run: |
         echo "no" | $HOME/Android/emulator/emulator -avd test -no-window -no-audio -gpu off &
@@ -60,26 +50,26 @@ jobs:
         adb shell input keyevent 82 # Unlock the emulator screen
         sleep 5 # Give the emulator some time to fully boot
 
-    # Step 7: Build the app
+    # Step 6: Build APK
     - name: Build APK
       run: |
         cd testapp
         ./gradlew clean assembleDebug
 
-    # Step 8: Run Specific Test
+    # Step 7: Run Specific Test
     - name: Run Specific Test
       run: |
         cd testapp
         ./gradlew testDebugUnitTest --tests "com.example.myapplication.MainActivityTest"
 
-    # Step 9: Upload the APK
+    # Step 8: Upload APK as artifact
     - name: Upload APK as artifact
       uses: actions/upload-artifact@v3
       with:
         name: app-debug-apk
         path: testapp/app/build/outputs/apk/debug/app-debug.apk
 
-    # Step 10: Upload test results (optional)
+    # Step 9: Upload test results (optional)
     - name: Upload test results
       if: always()
       uses: actions/upload-artifact@v3
