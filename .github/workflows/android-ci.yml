@@ -50,22 +50,10 @@ jobs:
         cd testapp
         ./gradlew connectedAndroidTest
 
-    # Step 7: Create the release on GitHub and upload the APK
+    # Step 7: Create GitHub release and upload APK
     - name: Create Release and Upload APK to GitHub
-      uses: gh-actions/create-release@v1.3.0
+      uses: softprops/action-gh-release@v1
       with:
-        tag_name: v${{ github.run_number }}  # Using the run number as the tag
-        release_name: Release v${{ github.run_number }}
-        body: 'Release of the new version of the app'
-        draft: false  # If you want the release to be a draft, set to true
-        prerelease: false  # Set to true if it's a prerelease
-        token: ${{ secrets.GITHUB_TOKEN }}
-
-    # Step 8: Upload APK as a release asset
-    - name: Upload APK to Release
-      uses: actions/upload-release-asset@v1
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: testapp/app/build/outputs/apk/debug/app-debug.apk
-        asset_name: app-debug.apk
-        asset_content_type: application/vnd.android.package-archive
+        files: testapp/app/build/outputs/apk/debug/app-debug.apk
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
