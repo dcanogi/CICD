@@ -90,15 +90,12 @@ jobs:
       - name: Zip Files
         uses: papeloto/action-zip@v1
         with:
-          # Specify the files to be zipped (APK and AAB)
           files: ${{ steps.releaseAab.outputs.aabfile }} ${{ steps.releaseApk.outputs.apkfile }}
-          # Set the destination name for the zip file
           dest: ${{ steps.releaseApk.outputs.apkfile }}.zip
 
       # Step 12: Upload the APK file as an artifact for download or further use
       - name: Upload Release Build to Artifacts
         uses: actions/upload-artifact@v3
         with:
-          # Name of the artifact and the path to the APK file
           name: release-artifacts
           path: ${{ steps.releaseApk.outputs.apkfile }}
