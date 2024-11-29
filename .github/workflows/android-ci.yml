@@ -1,7 +1,6 @@
 name: Production Builds
 on:
   workflow_dispatch:
-    # This allows the workflow to be triggered manually with inputs
     inputs:
       name:
         description: "Release-Build"
@@ -14,9 +13,11 @@ on:
           - internalTesters
           - everyone
 
+permissions:
+  contents: write  # Allows write permissions to the repository, needed to create tags and releases
+
 jobs:
   build:
-    # This job runs on an Ubuntu machine provided by GitHub Actions
     runs-on: ubuntu-latest
 
     steps:
@@ -36,17 +37,15 @@ jobs:
         uses: android-actions/setup-android@v2.0.10
 
       # Step 4: Decode the keystore that is stored as base64 in GitHub secrets
+      # The decoded keystore is stored in the /testapp path
       - name: Decode Keystore
         env:
-          # Fetch the secrets from GitHub Secrets
           ENCODED_STRING: ${{ secrets.KEYSTORE_BASE_64 }}
           RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
           RELEASE_KEYSTORE_ALIAS: ${{ secrets.RELEASE_KEYSTORE_ALIAS }}
           RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
         run: |
-          # Write the base64 encoded keystore string to a file
           echo $ENCODED_STRING > keystore-b64.txt
-          # Decode the base64 file and save it as a keystore.jks file
           base64 -d keystore-b64.txt > testapp/keystore.jks
 
       # Step 5: Give executable permissions to the Gradle wrapper
@@ -55,11 +54,6 @@ jobs:
 
       # Step 6: Build the release APK using Gradle
       - name: Build Release apk
-        env:
-          # Pass sensitive information (keystore passwords) to the Gradle build
-          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
-          RELEASE_KEYSTORE_ALIAS: ${{ secrets.RELEASE_KEYSTORE_ALIAS }}
-          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
         run: cd testapp && ./gradlew assembleRelease --stacktrace
 
       # Step 7: Run Android unit tests on the debug build
@@ -68,43 +62,30 @@ jobs:
 
       # Step 8: Build the release bundle (AAB file)
       - name: Build Release bundle
-        env:
-          # Pass keystore information for signing the bundle
-          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
-          RELEASE_KEYSTORE_ALIAS: ${{ secrets.RELEASE_KEYSTORE_ALIAS }}
-          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
         run: cd testapp && ./gradlew bundleRelease --stacktrace
 
+      # Step 9: Create GitHub Release Tag
       - name: Create GitHub Release Tag
         id: create_tag
         run: |
-          TAG_NAME="v1.0.${{ github.run_number }}"
-          git tag $TAG_NAME
-          git push origin $TAG_NAME
+          TAG_NAME="v1.0.${{ github.run_number }}"  # Generate the tag name dynamically
+          git tag $TAG_NAME  # Create a tag
+          git push origin $TAG_NAME  # Push the tag to the repository
         env:
-          GITHUB_TOKEN: ${{ secrets.TOKEN }}
+          TOKEN: ${{ secrets.TOKEN }}
 
-      # Step 9: Get the path of the generated AAB file
-      - name: Get release file aab path
-        id: releaseAab
-        run: echo "aabfile=$(find testapp/app/build/outputs/bundle/release/*.aab)" >> $GITHUB_OUTPUT
+      # Step 10: List files in APK directory (for debugging purposes)
+      - name: List files in APK directory
+        run: ls -l testapp/app/build/outputs/apk/release/
 
-      # Step 10: Get the path of the generated APK file
-      - name: Get release file apk path
-        id: releaseApk
-        run: echo "apkfile=$(find testapp/app/build/outputs/apk/release/*.apk)" >> $GITHUB_OUTPUT
+      # Step 11: List files in AAB directory (for debugging purposes)
+      - name: List files in AAB directory
+        run: ls -l testapp/app/build/outputs/bundle/release/
 
-      # Step 11: Zip the APK and AAB files together for packaging
-      - name: Zip Files
-        uses: papeloto/action-zip@v1
-        with:
-          files: ${{ steps.releaseAab.outputs.aabfile }} ${{ steps.releaseApk.outputs.apkfile }}
-          dest: ${{ steps.releaseApk.outputs.apkfile }}.zip
-
-      # Step 12: Create a new release in GitHub and upload the APK and AAB files
+      # Step 12: Create Release and Upload Files
       - name: Create Release and Upload Files
         uses: softprops/action-gh-release@v1
         with:
-          files: ${{ steps.releaseApk.outputs.apkfile }} ${{ steps.releaseAab.outputs.aabfile }}
+          files: testapp/app/build/outputs/apk/release/app-release-unsigned.apk testapp/app/build/outputs/bundle/release/app-release.aab
         env:
-          GITHUB_TOKEN: ${{ secrets.TOKEN }}
+          TOKEN: ${{ secrets.TOKEN }}
