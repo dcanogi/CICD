@@ -83,9 +83,10 @@ jobs:
         run: ls -l testapp/app/build/outputs/bundle/release/
 
       # Step 12: Create Release and Upload Files
-      - name: Create Release and Upload Files
+      - name: Create GitHub Release and Upload Files
         uses: softprops/action-gh-release@v1
         with:
           files: testapp/app/build/outputs/apk/release/app-release-unsigned.apk testapp/app/build/outputs/bundle/release/app-release.aab
         env:
-          TOKEN: ${{ secrets.TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.TOKEN }}  # Use the proper token for GitHub authentication
+          TAG_NAME: ${{ steps.create_tag.outputs.TAG_NAME }}  # Ensure the tag name is passed correctly
