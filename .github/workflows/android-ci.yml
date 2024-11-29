@@ -98,4 +98,4 @@ jobs:
         with:
           files: ${{ steps.releaseApk.outputs.apkfile }} ${{ steps.releaseAab.outputs.aabfile }}
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.TOKEN }}
