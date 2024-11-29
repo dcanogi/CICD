@@ -75,6 +75,15 @@ jobs:
           RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
         run: cd testapp && ./gradlew bundleRelease --stacktrace
 
+      - name: Create GitHub Release Tag
+        id: create_tag
+        run: |
+          TAG_NAME="v1.0.${{ github.run_number }}"
+          git tag $TAG_NAME
+          git push origin $TAG_NAME
+        env:
+          GITHUB_TOKEN: ${{ secrets.TOKEN }}
+
       # Step 9: Get the path of the generated AAB file
       - name: Get release file aab path
         id: releaseAab
