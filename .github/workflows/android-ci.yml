@@ -36,7 +36,6 @@ jobs:
         uses: android-actions/setup-android@v2.0.10
 
       # Step 4: Decode the keystore that is stored as base64 in GitHub secrets
-      # The decoded keystore is stored in the /testapp path
       - name: Decode Keystore
         env:
           # Fetch the secrets from GitHub Secrets
@@ -93,9 +92,10 @@ jobs:
           files: ${{ steps.releaseAab.outputs.aabfile }} ${{ steps.releaseApk.outputs.apkfile }}
           dest: ${{ steps.releaseApk.outputs.apkfile }}.zip
 
-      # Step 12: Upload the APK file as an artifact for download or further use
-      - name: Upload Release Build to Artifacts
-        uses: actions/upload-artifact@v3
+      # Step 12: Create a new release in GitHub and upload the APK and AAB files
+      - name: Create Release and Upload Files
+        uses: softprops/action-gh-release@v1
         with:
-          name: release-artifacts
-          path: ${{ steps.releaseApk.outputs.apkfile }}
+          files: ${{ steps.releaseApk.outputs.apkfile }} ${{ steps.releaseAab.outputs.aabfile }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
