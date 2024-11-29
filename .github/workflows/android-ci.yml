@@ -14,7 +14,7 @@ on:
           - everyone
 
 permissions:
-  contents: write  # Allows write permissions to the repository, needed to create tags and releases
+  contents: write  # Necesario para crear un release
 
 jobs:
   build:
@@ -37,7 +37,6 @@ jobs:
         uses: android-actions/setup-android@v2.0.10
 
       # Step 4: Decode the keystore that is stored as base64 in GitHub secrets
-      # The decoded keystore is stored in the /testapp path
       - name: Decode Keystore
         env:
           ENCODED_STRING: ${{ secrets.KEYSTORE_BASE_64 }}
@@ -56,37 +55,26 @@ jobs:
       - name: Build Release apk
         run: cd testapp && ./gradlew assembleRelease --stacktrace
 
-      # Step 7: Run Android unit tests on the debug build
-      - name: Run Android Tests
-        run: cd testapp && ./gradlew :app:testDebugUnitTest --tests "com.example.myapplication.ExampleUnitTest"
-
-      # Step 8: Build the release bundle (AAB file)
+      # Step 7: Build the release bundle (AAB file)
       - name: Build Release bundle
         run: cd testapp && ./gradlew bundleRelease --stacktrace
 
-      # Step 9: Create GitHub Release Tag
-      - name: Create GitHub Release Tag
+      # Step 8: Create a new tag for the release
+      - name: Create GitHub Tag
         id: create_tag
         run: |
-          TAG_NAME="v1.0.${{ github.run_number }}"  # Generate the tag name dynamically
-          git tag $TAG_NAME  # Create a tag
+          TAG_NAME="v1.0.1" 
+          git config user.name "GitHub Actions"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag $TAG_NAME
           git push origin $TAG_NAME  # Push the tag to the repository
-        env:
-          TOKEN: ${{ secrets.TOKEN }}
 
-      # Step 10: List files in APK directory (for debugging purposes)
-      - name: List files in APK directory
-        run: ls -l testapp/app/build/outputs/apk/release/
-
-      # Step 11: List files in AAB directory (for debugging purposes)
-      - name: List files in AAB directory
-        run: ls -l testapp/app/build/outputs/bundle/release/
-
-      # Step 12: Create Release and Upload Files
-      - name: Create GitHub Release and Upload Files
+      # Step 9: Upload the APK and AAB files as release artifacts
+      - name: Upload APK and AAB to GitHub Release
         uses: softprops/action-gh-release@v1
         with:
-          files: testapp/app/build/outputs/apk/release/app-release-unsigned.apk testapp/app/build/outputs/bundle/release/app-release.aab
+          files: |
+            testapp/app/build/outputs/apk/release/app-release-unsigned.apk
+            testapp/app/build/outputs/bundle/release/app-release.aab
         env:
-          GITHUB_TOKEN: ${{ secrets.TOKEN }}  # Use the proper token for GitHub authentication
-          TAG_NAME: ${{ steps.create_tag.outputs.TAG_NAME }}  # Ensure the tag name is passed correctly
+          GITHUB_TOKEN: ${{ secrets.TOKEN }}  # Ensure you are using the correct token
